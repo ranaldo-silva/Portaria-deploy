@@ -6,6 +6,7 @@ import br.com.fiap.Portaria.entity.Usuario;
 import br.com.fiap.Portaria.repository.UsuarioRepository;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
+import br.com.fiap.Portaria.service.MoradorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,9 @@ public class AuthController {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private MoradorService moradorService;
 
     @Autowired
     private jakarta.persistence.EntityManager entityManager;
@@ -46,7 +50,7 @@ public class AuthController {
                 usuario.setEmail(email);
                 usuario.setFirebaseUid(uid);
                 
-                // Mapeia automaticamente o perfil (ADMIN ou MORADOR) com regras estritas
+                // Mapeia automaticamente o perfil (ADMIN ou MORADOR) com as novas regras
                 if (email.toLowerCase().contains("@admin") || email.toLowerCase().contains("@porteiro")) {
                     usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.ADMIN);
                 } else {
@@ -103,7 +107,6 @@ public class AuthController {
                 usuario.setEmail(email);
                 usuario.setFirebaseUid(uid);
                 
-                // Mapeia automaticamente o perfil (ADMIN ou MORADOR) com regras estritas
                 if (email.toLowerCase().contains("@admin") || email.toLowerCase().contains("@porteiro")) {
                     usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.ADMIN);
                 } else {
@@ -113,6 +116,23 @@ public class AuthController {
                 jakarta.persistence.Query query = entityManager.createNativeQuery("SELECT NVL(MAX(ID_USUARIO), 0) + 1 FROM TPL_USUARIO");
                 Integer proximoId = ((Number) query.getSingleResult()).intValue();
                 usuario.setIdUsuario(proximoId);
+
+                // Criar o registro físico do Morador se os dados foram enviados na tela do App
+                if (usuario.getPerfil() == br.com.fiap.Portaria.dto.enums.Role.MORADOR && body.getNome() != null && body.getTelefone() != null && body.getApartamentoId() != null) {
+                    try {
+                        br.com.fiap.Portaria.dto.MoradorRequestDTO moradorDTO = new br.com.fiap.Portaria.dto.MoradorRequestDTO();
+                        moradorDTO.setNome(body.getNome());
+                        moradorDTO.setTelefone(body.getTelefone());
+                        moradorDTO.setEmail(email);
+                        moradorDTO.setApartamentoId(Integer.parseInt(body.getApartamentoId()));
+                        
+                        // Salva o Morador e pega o ID dele
+                        br.com.fiap.Portaria.dto.MoradorResponseDTO moradorCriado = moradorService.salvar(moradorDTO);
+                        usuario.setIdMorador(moradorCriado.getId()); // Vincula o acesso do usuário àquele morador físico
+                    } catch (Exception ex) {
+                        System.err.println("Erro ao criar morador no registro: " + ex.getMessage());
+                    }
+                }
                 
                 usuario = usuarioRepository.save(usuario);
             } else {
