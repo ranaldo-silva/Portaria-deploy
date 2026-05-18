@@ -8,4 +8,5 @@ public class FirebaseRegisterRequestDTO {
     private String nome;
     private String telefone;
     private String apartamentoId;
+    private String bloco;
 }
