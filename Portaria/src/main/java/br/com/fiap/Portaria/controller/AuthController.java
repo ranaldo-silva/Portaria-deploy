@@ -1,6 +1,7 @@
 package br.com.fiap.Portaria.controller;
 
 import br.com.fiap.Portaria.dto.FirebaseRegisterRequestDTO;
+import br.com.fiap.Portaria.dto.enums.Role;
 import br.com.fiap.Portaria.entity.Usuario;
 import br.com.fiap.Portaria.repository.UsuarioRepository;
 import br.com.fiap.Portaria.service.MoradorService;
@@ -43,7 +44,6 @@ public class AuthController {
                                 "id", usuario.getIdUsuario(),
                                 "perfil", usuario.getPerfil().name(),
                                 "idMorador", usuario.getIdMorador() != null ? usuario.getIdMorador() : "",
-                                "nome", usuario.getNome(),
                                 "email", usuario.getEmail()
                         )
                 ));
@@ -72,41 +72,24 @@ public class AuthController {
             if (usuarioOpt.isPresent()) {
                 return ResponseEntity.badRequest().body("Usuário já existe no banco relacional.");
             } else {
-                // Cria novo usuário
+                // Cria novo usuário (A entidade Usuario tem apenas id, email, firebaseUid, perfil, idMorador, idPortaria)
                 Usuario usuario = new Usuario();
                 usuario.setEmail(email);
+                usuario.setFirebaseUid(uid);
 
-                // Força o nome fornecido no cadastro, senão tenta do Firebase
-                if (body.getNome() != null && !body.getNome().isBlank()) {
-                    usuario.setNome(body.getNome());
+                // REGRAS DE SEGURANÇA BASEADAS NO E-MAIL:
+                if (email.contains("@admin") || email.contains("@porteiro")) {
+                    usuario.setPerfil(Role.ADMIN);
                 } else {
-                    usuario.setNome(decodedToken.getName() != null ? decodedToken.getName() : email.split("@")[0]);
+                    usuario.setPerfil(Role.MORADOR);
                 }
 
-                // Senha provisória já que a auth é via Firebase
-                usuario.setSenha("FIREBASE_AUTH_" + uid);
-
-                // REGRAS RIGOROSAS DE SEGURANÇA BASEADAS NO E-MAIL:
-                // Se for @admin.com, vira ADMIN.
-                // Se for @porteiro.com, vira PORTEIRO.
-                // Qualquer outra coisa, vira MORADOR.
-                if (email.contains("@admin")) {
-                    usuario.setPerfil(Usuario.PerfilAcesso.ADMIN);
-                    usuario.setAtivo(true);
-                } else if (email.contains("@porteiro")) {
-                    usuario.setPerfil(Usuario.PerfilAcesso.PORTEIRO);
-                    usuario.setAtivo(true);
-                } else {
-                    usuario.setPerfil(Usuario.PerfilAcesso.MORADOR);
-                    usuario.setAtivo(true);
-                }
-
-                // 2. Se for Morador, tentamos criar a entidade MORADOR no banco Oracle automaticamente!
-                if (usuario.getPerfil() == Usuario.PerfilAcesso.MORADOR) {
+                // 2. Se for Morador, criamos a entidade MORADOR no banco Oracle automaticamente!
+                if (usuario.getPerfil() == Role.MORADOR) {
                     if (body.getTelefone() != null && body.getApartamentoId() != null) {
                         try {
                             br.com.fiap.Portaria.dto.MoradorRequestDTO moradorDTO = new br.com.fiap.Portaria.dto.MoradorRequestDTO();
-                            moradorDTO.setNome(body.getNome());
+                            moradorDTO.setNome(body.getNome() != null && !body.getNome().isBlank() ? body.getNome() : "Morador Registrado");
                             moradorDTO.setEmail(email);
                             moradorDTO.setTelefone(body.getTelefone());
                             moradorDTO.setBloco(body.getBloco() != null && !body.getBloco().isBlank() ? body.getBloco() : "A");
@@ -131,10 +114,9 @@ public class AuthController {
                 return ResponseEntity.ok(Map.of(
                         "message", "Usuário criado com sucesso no banco relacional.",
                         "user", Map.of(
-                                "id", usuario.getIdUsuario(),
+                                "id", usuario.getIdUsuario() != null ? usuario.getIdUsuario() : 0,
                                 "perfil", usuario.getPerfil().name(),
                                 "idMorador", usuario.getIdMorador() != null ? usuario.getIdMorador() : "",
-                                "nome", usuario.getNome(),
                                 "email", usuario.getEmail()
                         )
                 ));
