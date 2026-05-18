@@ -7,6 +7,8 @@ import br.com.fiap.Portaria.repository.UsuarioRepository;
 import br.com.fiap.Portaria.service.MoradorService;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +25,9 @@ public class AuthController {
 
     @Autowired
     private MoradorService moradorService;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @PostMapping("/firebase-login")
     public ResponseEntity<?> firebaseLogin(@RequestBody Map<String, String> body) {
@@ -72,8 +77,14 @@ public class AuthController {
             if (usuarioOpt.isPresent()) {
                 return ResponseEntity.badRequest().body("Usuário já existe no banco relacional.");
             } else {
-                // Cria novo usuário (A entidade Usuario tem apenas id, email, firebaseUid, perfil, idMorador, idPortaria)
+                // Se o usuário foi criado no Firebase mas não existe no SQL, cria ele automaticamente!
                 Usuario usuario = new Usuario();
+                
+                // Pega o próximo ID válido na tabela da Oracle
+                Query query = entityManager.createNativeQuery("SELECT NVL(MAX(ID_USUARIO), 0) + 1 FROM TPL_USUARIO");
+                Integer proximoId = ((Number) query.getSingleResult()).intValue();
+                usuario.setIdUsuario(proximoId);
+
                 usuario.setEmail(email);
                 usuario.setFirebaseUid(uid);
 
