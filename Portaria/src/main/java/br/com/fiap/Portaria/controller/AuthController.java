@@ -46,8 +46,8 @@ public class AuthController {
                 usuario.setEmail(email);
                 usuario.setFirebaseUid(uid);
                 
-                // Mapeia automaticamente o perfil (ADMIN ou MORADOR)
-                if (email.toLowerCase().contains("admin") || email.toLowerCase().contains("porteiro") || email.toLowerCase().contains("pietro") || email.toLowerCase().contains("nunes") || email.toLowerCase().contains("fiap")) {
+                // Mapeia automaticamente o perfil (ADMIN ou MORADOR) com regras estritas
+                if (email.toLowerCase().contains("@admin") || email.toLowerCase().contains("@porteiro")) {
                     usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.ADMIN);
                 } else {
                     usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.MORADOR);
@@ -103,7 +103,8 @@ public class AuthController {
                 usuario.setEmail(email);
                 usuario.setFirebaseUid(uid);
                 
-                if (email.toLowerCase().contains("admin") || email.toLowerCase().contains("porteiro") || email.toLowerCase().contains("pietro") || email.toLowerCase().contains("nunes") || email.toLowerCase().contains("fiap")) {
+                // Mapeia automaticamente o perfil (ADMIN ou MORADOR) com regras estritas
+                if (email.toLowerCase().contains("@admin") || email.toLowerCase().contains("@porteiro")) {
                     usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.ADMIN);
                 } else {
                     usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.MORADOR);
