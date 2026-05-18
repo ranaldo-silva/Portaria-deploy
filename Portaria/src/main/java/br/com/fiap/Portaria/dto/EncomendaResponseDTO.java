@@ -14,6 +14,8 @@ public class EncomendaResponseDTO {
     private String origem;
     private String descricao;
     private Boolean foiRetirada;
+    private java.util.Date dataRecebida;
+    private java.time.LocalDateTime retiradaEm;
     private MoradorResumoDTO morador;
 
     @Data
