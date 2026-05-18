@@ -41,14 +41,8 @@ public class MoradorService {
 
     public MoradorResponseDTO salvar(MoradorRequestDTO dto) {
         Morador morador = new Morador();
-
-        // Quebrando o nome completo recebido em nome e sobrenome
-        if (dto.getNome() != null) {
-            String[] nomes = dto.getNome().split(" ", 2);
-            morador.setNome(nomes[0]);
-            morador.setSobrenome(nomes.length > 1 ? nomes[1] : "");
-        }
-        
+        morador.setNome(dto.getNome() != null ? dto.getNome() : "Desconhecido");
+        morador.setEmail(dto.getEmail());
         morador.setTelefone(dto.getTelefone());
 
         // Se passar um ID de apartamento, tenta achar no banco, se não achar, cria um genérico para evitar erro de ForeignKey
@@ -75,12 +69,9 @@ public class MoradorService {
     public MoradorResponseDTO atualizar(Integer id, MoradorRequestDTO dto) {
         return moradorRepository.findById(id)
                 .map(morador -> {
-                    if (dto.getNome() != null) {
-                        String[] nomes = dto.getNome().split(" ", 2);
-                        morador.setNome(nomes[0]);
-                        morador.setSobrenome(nomes.length > 1 ? nomes[1] : "");
-                    }
+                    if (dto.getNome() != null) morador.setNome(dto.getNome());
                     if (dto.getTelefone() != null) morador.setTelefone(dto.getTelefone());
+                    if (dto.getEmail() != null) morador.setEmail(dto.getEmail());
 
                     if (dto.getApartamentoId() != null) {
                         Apartamento apartamento = apartamentoRepository.findById(dto.getApartamentoId())
@@ -107,20 +98,21 @@ public class MoradorService {
     }
 
     private MoradorResponseDTO toResponseDTO(Morador morador) {
-        MoradorResponseDTO.ApartamentoResumoDTO apResumo = null;
+        String bloco = null;
+        String ap = null;
+
         if (morador.getApartamento() != null) {
-            apResumo = new MoradorResponseDTO.ApartamentoResumoDTO(
-                    morador.getApartamento().getIdApartamento(),
-                    morador.getApartamento().getNumero(),
-                    morador.getApartamento().getBloco()
-            );
+            bloco = morador.getApartamento().getBloco();
+            ap = morador.getApartamento().getNumero();
         }
+
         return new MoradorResponseDTO(
                 morador.getIdMorador(),
                 morador.getNome(),
-                morador.getSobrenome(),
                 morador.getTelefone(),
-                apResumo
+                morador.getEmail(),
+                bloco,
+                ap
         );
     }
 }
