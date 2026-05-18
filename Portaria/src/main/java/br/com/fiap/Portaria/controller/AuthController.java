@@ -1,15 +1,11 @@
 package br.com.fiap.Portaria.controller;
 
-import br.com.fiap.Portaria.dto.FirebaseLoginRequestDTO;
 import br.com.fiap.Portaria.dto.FirebaseRegisterRequestDTO;
 import br.com.fiap.Portaria.entity.Usuario;
 import br.com.fiap.Portaria.repository.UsuarioRepository;
+import br.com.fiap.Portaria.service.MoradorService;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
-import br.com.fiap.Portaria.service.MoradorService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +15,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/auth")
-@Tag(name = "Autenticação", description = "Login e registro via Firebase — não exigem token no header")
 public class AuthController {
 
     @Autowired
@@ -28,134 +23,126 @@ public class AuthController {
     @Autowired
     private MoradorService moradorService;
 
-    @Autowired
-    private jakarta.persistence.EntityManager entityManager;
-
-    @Operation(summary = "Login com Firebase", description = "Envia o idToken do Firebase e recebe os dados do usuário autenticado")
-    @ApiResponse(responseCode = "200", description = "Login realizado com sucesso")
-    @ApiResponse(responseCode = "401", description = "Token Firebase inválido")
-    @ApiResponse(responseCode = "404", description = "Email não cadastrado no sistema")
     @PostMapping("/firebase-login")
-    public ResponseEntity<?> firebaseLogin(@RequestBody FirebaseLoginRequestDTO body) {
+    public ResponseEntity<?> firebaseLogin(@RequestBody Map<String, String> body) {
+        String token = body.get("token");
+        if (token == null) return ResponseEntity.badRequest().body("Token não fornecido.");
+
         try {
-            FirebaseToken firebaseToken = FirebaseAuth.getInstance().verifyIdToken(body.getToken());
-            String email = firebaseToken.getEmail();
-            String uid = firebaseToken.getUid();
+            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token);
+            String email = decodedToken.getEmail();
 
             Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(email);
-            Usuario usuario;
-            if (usuarioOpt.isEmpty()) {
-                // Se o usuário foi criado no Firebase mas não existe no SQL (ex: criado pelo painel Super Admin), cria ele automaticamente!
-                usuario = new Usuario();
-                usuario.setEmail(email);
-                usuario.setFirebaseUid(uid);
-                
-                // Mapeia automaticamente o perfil (ADMIN ou MORADOR) com as novas regras
-                if (email.toLowerCase().contains("@admin") || email.toLowerCase().contains("@porteiro")) {
-                    usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.ADMIN);
-                } else {
-                    usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.MORADOR);
-                }
-                
-                // Busca o próximo ID disponível para ID_USUARIO
-                jakarta.persistence.Query query = entityManager.createNativeQuery("SELECT NVL(MAX(ID_USUARIO), 0) + 1 FROM TPL_USUARIO");
-                Integer proximoId = ((Number) query.getSingleResult()).intValue();
-                usuario.setIdUsuario(proximoId);
-                
-                usuario = usuarioRepository.save(usuario);
+
+            if (usuarioOpt.isPresent()) {
+                Usuario usuario = usuarioOpt.get();
+                // Se já existir, retorna as informações dele
+                return ResponseEntity.ok(Map.of(
+                        "message", "Login bem-sucedido via Firebase.",
+                        "user", Map.of(
+                                "id", usuario.getIdUsuario(),
+                                "perfil", usuario.getPerfil().name(),
+                                "idMorador", usuario.getIdMorador() != null ? usuario.getIdMorador() : "",
+                                "nome", usuario.getNome(),
+                                "email", usuario.getEmail()
+                        )
+                ));
             } else {
-                usuario = usuarioOpt.get();
-                // vincula o firebaseUid se ainda não tiver
-                if (usuario.getFirebaseUid() == null) {
-                    usuario.setFirebaseUid(uid);
-                    usuarioRepository.save(usuario);
-                }
+                return ResponseEntity.status(404).body("Usuário verificado pelo Firebase, mas não encontrado no banco relacional da portaria.");
             }
 
-            return ResponseEntity.ok(Map.of(
-                    "uid", uid,
-                    "email", email,
-                    "user", Map.of(
-                            "id", usuario.getIdUsuario(),
-                            "perfil", usuario.getPerfil().name(),
-                            "idMorador", usuario.getIdMorador() != null ? usuario.getIdMorador() : "",
-                            "idPortaria", usuario.getIdPortaria() != null ? usuario.getIdPortaria() : ""
-                    )
-            ));
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("erro", "Token Firebase inválido"));
+            e.printStackTrace();
+            return ResponseEntity.status(401).body("Token Firebase inválido: " + e.getMessage());
         }
     }
 
-    @Operation(summary = "Registro com Firebase", description = "Primeiro acesso — verifica se email existe no sistema e vincula o Firebase UID")
-    @ApiResponse(responseCode = "200", description = "Conta vinculada com sucesso")
-    @ApiResponse(responseCode = "400", description = "Conta já foi ativada anteriormente")
-    @ApiResponse(responseCode = "401", description = "Token Firebase inválido")
-    @ApiResponse(responseCode = "404", description = "Email não cadastrado no sistema")
     @PostMapping("/firebase-register")
     public ResponseEntity<?> firebaseRegister(@RequestBody FirebaseRegisterRequestDTO body) {
+        String token = body.getToken();
+        if (token == null) return ResponseEntity.badRequest().body("Token não fornecido.");
+
         try {
-            FirebaseToken firebaseToken = FirebaseAuth.getInstance().verifyIdToken(body.getToken());
-            String email = firebaseToken.getEmail();
-            String uid = firebaseToken.getUid();
+            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token);
+            String email = decodedToken.getEmail();
+            String uid = decodedToken.getUid();
 
             Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(email);
-            Usuario usuario;
-            if (usuarioOpt.isEmpty()) {
-                // Se o usuário foi criado no Firebase mas não existe no SQL, cria ele automaticamente!
-                usuario = new Usuario();
-                usuario.setEmail(email);
-                usuario.setFirebaseUid(uid);
-                
-                if (email.toLowerCase().contains("@admin") || email.toLowerCase().contains("@porteiro")) {
-                    usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.ADMIN);
-                } else {
-                    usuario.setPerfil(br.com.fiap.Portaria.dto.enums.Role.MORADOR);
-                }
-                
-                jakarta.persistence.Query query = entityManager.createNativeQuery("SELECT NVL(MAX(ID_USUARIO), 0) + 1 FROM TPL_USUARIO");
-                Integer proximoId = ((Number) query.getSingleResult()).intValue();
-                usuario.setIdUsuario(proximoId);
 
-                // Criar o registro físico do Morador se os dados foram enviados na tela do App
-                if (usuario.getPerfil() == br.com.fiap.Portaria.dto.enums.Role.MORADOR && body.getNome() != null && body.getTelefone() != null && body.getApartamentoId() != null) {
-                    try {
-                        br.com.fiap.Portaria.dto.MoradorRequestDTO moradorDTO = new br.com.fiap.Portaria.dto.MoradorRequestDTO();
-                        moradorDTO.setNome(body.getNome());
-                        moradorDTO.setTelefone(body.getTelefone());
-                        moradorDTO.setEmail(email);
-                        moradorDTO.setApartamentoId(Integer.parseInt(body.getApartamentoId()));
-                        
-                        // Salva o Morador e pega o ID dele
-                        br.com.fiap.Portaria.dto.MoradorResponseDTO moradorCriado = moradorService.salvar(moradorDTO);
-                        usuario.setIdMorador(moradorCriado.getId()); // Vincula o acesso do usuário àquele morador físico
-                    } catch (Exception ex) {
-                        System.err.println("Erro ao criar morador no registro: " + ex.getMessage());
+            if (usuarioOpt.isPresent()) {
+                return ResponseEntity.badRequest().body("Usuário já existe no banco relacional.");
+            } else {
+                // Cria novo usuário
+                Usuario usuario = new Usuario();
+                usuario.setEmail(email);
+
+                // Força o nome fornecido no cadastro, senão tenta do Firebase
+                if (body.getNome() != null && !body.getNome().isBlank()) {
+                    usuario.setNome(body.getNome());
+                } else {
+                    usuario.setNome(decodedToken.getName() != null ? decodedToken.getName() : email.split("@")[0]);
+                }
+
+                // Senha provisória já que a auth é via Firebase
+                usuario.setSenha("FIREBASE_AUTH_" + uid);
+
+                // REGRAS RIGOROSAS DE SEGURANÇA BASEADAS NO E-MAIL:
+                // Se for @admin.com, vira ADMIN.
+                // Se for @porteiro.com, vira PORTEIRO.
+                // Qualquer outra coisa, vira MORADOR.
+                if (email.contains("@admin")) {
+                    usuario.setPerfil(Usuario.PerfilAcesso.ADMIN);
+                    usuario.setAtivo(true);
+                } else if (email.contains("@porteiro")) {
+                    usuario.setPerfil(Usuario.PerfilAcesso.PORTEIRO);
+                    usuario.setAtivo(true);
+                } else {
+                    usuario.setPerfil(Usuario.PerfilAcesso.MORADOR);
+                    usuario.setAtivo(true);
+                }
+
+                // 2. Se for Morador, tentamos criar a entidade MORADOR no banco Oracle automaticamente!
+                if (usuario.getPerfil() == Usuario.PerfilAcesso.MORADOR) {
+                    if (body.getTelefone() != null && body.getApartamentoId() != null) {
+                        try {
+                            br.com.fiap.Portaria.dto.MoradorRequestDTO moradorDTO = new br.com.fiap.Portaria.dto.MoradorRequestDTO();
+                            moradorDTO.setNome(body.getNome());
+                            moradorDTO.setEmail(email);
+                            moradorDTO.setTelefone(body.getTelefone());
+                            moradorDTO.setBloco(body.getBloco() != null && !body.getBloco().isBlank() ? body.getBloco() : "A");
+
+                            // Converte o apartamento de forma segura
+                            try {
+                                moradorDTO.setApartamentoId(Integer.parseInt(body.getApartamentoId().replaceAll("[^0-9]", "")));
+                            } catch (NumberFormatException e) {
+                                moradorDTO.setApartamentoId(1); // fallback de segurança
+                            }
+                            
+                            br.com.fiap.Portaria.dto.MoradorResponseDTO moradorCriado = moradorService.salvar(moradorDTO);
+                            usuario.setIdMorador(moradorCriado.getId());
+                        } catch (Exception ex) {
+                            System.err.println("Erro ao criar morador no registro: " + ex.getMessage());
+                        }
                     }
                 }
-                
-                usuario = usuarioRepository.save(usuario);
-            } else {
-                usuario = usuarioOpt.get();
-                if (usuario.getFirebaseUid() != null) {
-                    return ResponseEntity.badRequest().body(Map.of("erro", "Conta já foi ativada anteriormente"));
-                }
-                usuario.setFirebaseUid(uid);
+
                 usuarioRepository.save(usuario);
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Usuário criado com sucesso no banco relacional.",
+                        "user", Map.of(
+                                "id", usuario.getIdUsuario(),
+                                "perfil", usuario.getPerfil().name(),
+                                "idMorador", usuario.getIdMorador() != null ? usuario.getIdMorador() : "",
+                                "nome", usuario.getNome(),
+                                "email", usuario.getEmail()
+                        )
+                ));
             }
 
-            return ResponseEntity.ok(Map.of(
-                    "uid", uid,
-                    "email", email,
-                    "user", Map.of(
-                            "id", usuario.getIdUsuario(),
-                            "perfil", usuario.getPerfil().name(),
-                            "idMorador", usuario.getIdMorador() != null ? usuario.getIdMorador() : "",
-                            "idPortaria", usuario.getIdPortaria() != null ? usuario.getIdPortaria() : ""
-                    )
-            ));
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("erro", "Token Firebase inválido"));
+            e.printStackTrace();
+            return ResponseEntity.status(401).body("Erro na validação Firebase: " + e.getMessage());
         }
     }
 }
