@@ -6,4 +6,6 @@ import lombok.Data;
 public class FirebaseRegisterRequestDTO {
     private String token;
     private String nome;
+    private String telefone;
+    private String apartamentoId;
 }
