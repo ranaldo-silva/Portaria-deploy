@@ -51,7 +51,14 @@ public class MoradorService {
 
         if (dto.getApartamentoId() != null) {
             Apartamento apartamento = apartamentoRepository.findById(dto.getApartamentoId())
-                    .orElseThrow(() -> new RuntimeException("Apartamento não encontrado"));
+                    .orElseGet(() -> {
+                        Apartamento newAp = new Apartamento();
+                        newAp.setIdApartamento(dto.getApartamentoId());
+                        newAp.setNumero(String.valueOf(dto.getApartamentoId()));
+                        newAp.setBloco("A"); // Bloco padrão para evitar falha de chave estrangeira
+                        newAp.setTorre(1);
+                        return apartamentoRepository.save(newAp);
+                    });
             morador.setApartamento(apartamento);
         }
 
@@ -70,7 +77,14 @@ public class MoradorService {
 
                     if (dto.getApartamentoId() != null) {
                         Apartamento apartamento = apartamentoRepository.findById(dto.getApartamentoId())
-                                .orElseThrow(() -> new RuntimeException("Apartamento não encontrado"));
+                                .orElseGet(() -> {
+                                    Apartamento newAp = new Apartamento();
+                                    newAp.setIdApartamento(dto.getApartamentoId());
+                                    newAp.setNumero(String.valueOf(dto.getApartamentoId()));
+                                    newAp.setBloco("A"); // Bloco padrão para evitar falha de chave estrangeira
+                                    newAp.setTorre(1);
+                                    return apartamentoRepository.save(newAp);
+                                });
                         morador.setApartamento(apartamento);
                     }
 
