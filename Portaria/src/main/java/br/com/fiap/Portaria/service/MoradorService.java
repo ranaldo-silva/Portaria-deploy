@@ -40,22 +40,25 @@ public class MoradorService {
     }
 
     public MoradorResponseDTO salvar(MoradorRequestDTO dto) {
-        if (dto.getNome() == null || dto.getNome().isBlank()) {
-            throw new RuntimeException("Nome do morador é obrigatório");
-        }
-
         Morador morador = new Morador();
-        morador.setNome(dto.getNome());
-        morador.setTelefone(dto.getTelefone());
-        morador.setEmail(dto.getEmail());
 
+        // Quebrando o nome completo recebido em nome e sobrenome
+        if (dto.getNome() != null) {
+            String[] nomes = dto.getNome().split(" ", 2);
+            morador.setNome(nomes[0]);
+            morador.setSobrenome(nomes.length > 1 ? nomes[1] : "");
+        }
+        
+        morador.setTelefone(dto.getTelefone());
+
+        // Se passar um ID de apartamento, tenta achar no banco, se não achar, cria um genérico para evitar erro de ForeignKey
         if (dto.getApartamentoId() != null) {
             Apartamento apartamento = apartamentoRepository.findById(dto.getApartamentoId())
                     .orElseGet(() -> {
                         Apartamento newAp = new Apartamento();
                         newAp.setIdApartamento(dto.getApartamentoId());
                         newAp.setNumero(String.valueOf(dto.getApartamentoId()));
-                        newAp.setBloco("A"); // Bloco padrão para evitar falha de chave estrangeira
+                        newAp.setBloco(dto.getBloco() != null && !dto.getBloco().isBlank() ? dto.getBloco() : "A");
                         newAp.setTorre(1);
                         return apartamentoRepository.save(newAp);
                     });
@@ -65,30 +68,28 @@ public class MoradorService {
         Integer proximoId = buscarProximoIdMorador();
         morador.setIdMorador(proximoId);
 
-        return toResponseDTO(moradorRepository.save(morador));
+        Morador salvo = moradorRepository.save(morador);
+        return toResponseDTO(salvo);
     }
 
     public MoradorResponseDTO atualizar(Integer id, MoradorRequestDTO dto) {
         return moradorRepository.findById(id)
                 .map(morador -> {
-                    if (dto.getNome() != null) morador.setNome(dto.getNome());
+                    if (dto.getNome() != null) {
+                        String[] nomes = dto.getNome().split(" ", 2);
+                        morador.setNome(nomes[0]);
+                        morador.setSobrenome(nomes.length > 1 ? nomes[1] : "");
+                    }
                     if (dto.getTelefone() != null) morador.setTelefone(dto.getTelefone());
-                    if (dto.getEmail() != null) morador.setEmail(dto.getEmail());
 
                     if (dto.getApartamentoId() != null) {
                         Apartamento apartamento = apartamentoRepository.findById(dto.getApartamentoId())
-                                .orElseGet(() -> {
-                                    Apartamento newAp = new Apartamento();
-                                    newAp.setIdApartamento(dto.getApartamentoId());
-                                    newAp.setNumero(String.valueOf(dto.getApartamentoId()));
-                                    newAp.setBloco("A"); // Bloco padrão para evitar falha de chave estrangeira
-                                    newAp.setTorre(1);
-                                    return apartamentoRepository.save(newAp);
-                                });
+                                .orElseThrow(() -> new RuntimeException("Apartamento não encontrado"));
                         morador.setApartamento(apartamento);
                     }
 
-                    return toResponseDTO(moradorRepository.save(morador));
+                    Morador atualizado = moradorRepository.save(morador);
+                    return toResponseDTO(atualizado);
                 })
                 .orElseThrow(() -> new RuntimeException("Morador não encontrado"));
     }
@@ -106,21 +107,20 @@ public class MoradorService {
     }
 
     private MoradorResponseDTO toResponseDTO(Morador morador) {
-        String bloco = null;
-        String numero = null;
-
+        MoradorResponseDTO.ApartamentoResumoDTO apResumo = null;
         if (morador.getApartamento() != null) {
-            bloco = morador.getApartamento().getBloco();
-            numero = morador.getApartamento().getNumero();
+            apResumo = new MoradorResponseDTO.ApartamentoResumoDTO(
+                    morador.getApartamento().getIdApartamento(),
+                    morador.getApartamento().getNumero(),
+                    morador.getApartamento().getBloco()
+            );
         }
-
         return new MoradorResponseDTO(
                 morador.getIdMorador(),
                 morador.getNome(),
+                morador.getSobrenome(),
                 morador.getTelefone(),
-                morador.getEmail(),
-                bloco,
-                numero
+                apResumo
         );
     }
 }
