@@ -126,6 +126,7 @@ public class EncomendaService {
         return token.toString();
     }
 
+    // AQUI ESTÁ A CORREÇÃO ENVIANDO AS DATAS:
     private EncomendaResponseDTO toResponseDTO(Encomenda encomenda) {
         EncomendaResponseDTO.MoradorResumoDTO moradorResumo = null;
         if (encomenda.getMorador() != null) {
@@ -140,6 +141,8 @@ public class EncomendaService {
                 encomenda.getOrigem(),
                 encomenda.getDescricao(),
                 encomenda.getFoiRetirada(),
+                encomenda.getDataRecebida(),  // Nova linha adicionada
+                encomenda.getRetiradaEm(),    // Nova linha adicionada
                 moradorResumo
         );
     }
