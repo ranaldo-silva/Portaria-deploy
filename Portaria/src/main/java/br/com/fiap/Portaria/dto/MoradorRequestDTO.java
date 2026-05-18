@@ -8,4 +8,5 @@ public class MoradorRequestDTO {
     private String telefone;
     private String email;
     private Integer apartamentoId;
+    private String bloco;
 }
