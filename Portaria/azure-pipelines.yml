@@ -6,18 +6,13 @@ pool:
 
 steps:
 
-- task: JavaToolInstaller@0
-  inputs:
-    versionSpec: '21'
-    jdkArchitectureOption: 'x64'
-    jdkSourceOption: 'PreInstalled'
+- script: |
+    pwd
+    ls -la
+    find . -name gradlew
+  displayName: 'Verificar estrutura'
 
 - script: |
     chmod +x gradlew
     ./gradlew clean build
   displayName: 'Build Spring Boot'
-
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: 'build/libs'
-    ArtifactName: 'springboot-artifact'
