@@ -1,18 +1,25 @@
 trigger:
-- main
+  - main
 
 pool:
   vmImage: 'ubuntu-latest'
 
 steps:
+  - checkout: self
 
-- script: |
-    pwd
-    ls -la
-    find . -name gradlew
-  displayName: 'Verificar estrutura'
+  - task: JavaToolInstaller@0
+    inputs:
+      versionSpec: '21'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
 
-- script: |
-    chmod +x gradlew
-    ./gradlew clean build
-  displayName: 'Build Spring Boot'
+  - script: |
+      chmod +x gradlew
+      ./gradlew clean build
+    displayName: 'Build Spring Boot'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: 'build/libs'
+      ArtifactName: 'springboot-artifact'
+      publishLocation: 'Container'
